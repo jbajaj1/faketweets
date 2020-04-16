@@ -16,10 +16,10 @@ def load_tweets(filename):
     return X, y
 
 class Vocab:
-
-    p_t = 0   # Used for padding short sentences
-    s_t = 1   # Start-of-sentence token
-    e_t = 2   # End-of-sentence token
+    #variables weren't working for some reason
+    #p_t = 0   # Used for padding short sentences
+    #s_t = 1   # Start-of-sentence token
+    #e_t = 2   # End-of-sentence token
 
     def __init__(self, name):
         self.name = name
@@ -62,6 +62,30 @@ class Vocab:
     def to_index(self, word):
         return self.word2index[word]
 
+    def sentence_to_vec(self, sentence):
+        vec = []
+        for word in sentence:
+            vec.append[self.to_index(word)]
+        return vec
+
+
+class LSTM(torch.nn.Module):
+    def __init__(self, vocab_size, embedding_size, hidden_size, num_layers=1, dropout=0.1):
+        super().__init__()
+        self.vocab_size = vocab_size
+        self.embedding_size = embedding_size
+        self.hidden_size = hidden_size
+        self. num_layers = num_layers
+        self.dropout = dropout
+
+        self.embedding = nn.Embedding(self.vocab_size, self.embedding_size)
+
+    def arrToVec(self, X):
+        xMat = []
+        for sentence in X:
+            xMat.append(twitterVoc.sentence_to_vec(sentence))
+        return xMat
+
 twitterVoc = Vocab("twitter")
 
 tweets = load_tweets("./twitter_sentiment/semeval_train.txt")
@@ -76,3 +100,7 @@ print(twitterVoc.to_word(4))
 print(twitterVoc.to_index("this"))
 
 print(twitterVoc.num_words)
+
+ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
+
+
