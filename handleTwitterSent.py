@@ -83,29 +83,22 @@ class LSTM(torch.nn.Module):
 
         self.embedding = nn.Embedding(self.vocab_size, self.embedding_size)
         self.rnn = nn.LSTM(self.embedding_size, self.hidden_size, self.num_layers, batch_first=True)
-        self.output = nn.Linear(self.hidden_size, self.vocab_size)
+        self.output = nn.Linear(self.hidden_size, 3)
 
 
-    def arrToVec(self, X):
-        xMat = []
-        for sentence in X:
-            xMat.append(twitterVoc.sentence_to_vec(sentence))
-        xMat = torch.stack(xMat)
-        return xMat
 
     def forward(self, X):
         print(X)
-        xMat = self.arrToVec(X)
-        emb = self.embedding(xMat)
+        emb = self.embedding(X)
         emb = self.dropout(emb)
 
-        hidden_states, final_state = self.rnn(emb, init_hidden_state)
+        hidden_states, _ = self.rnn(emb)
 
         hidden_states = self.dropout(hidden_states)
 
         output_dist = self.output(hidden_states)
 
-        return output_dist, hidden_states, final_state
+        return output_dist
 
 
 
@@ -117,7 +110,7 @@ for t in tweets[0]:
     twitterVoc.add_sentence(t)
 for t in tweets[0]:
     tokenizedTweets.append(twitterVoc.sentence_to_vec(t))
-tokenizedTweets = torch.IntTensor(tokenizedTweets)
+tokenizedTweets = torch.LongTensor(tokenizedTweets)
 
 print(twitterVoc.to_word(4))
 print(twitterVoc.to_index("this"))
@@ -127,4 +120,4 @@ print(twitterVoc.num_words)
 
 ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
 
-
+ourLSTM.forward(tokenizedTweets[:50])
