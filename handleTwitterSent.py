@@ -88,12 +88,14 @@ class LSTM(torch.nn.Module):
 
 
     def forward(self, X):
-        print(X)
         emb = self.embedding(X)
         emb = self.dropout(emb)
 
         hidden_states, _ = self.rnn(emb)
 
+        numMask = (X != 0).float()
+        mask = (X != 0).float().unsqueeze(-1).expand(hidden_states.size())
+        hidden_states = (hidden_states*mask).sum(-2)/numMask.sum(-1).unsqueeze(-1)
         hidden_states = self.dropout(hidden_states)
 
         output_dist = self.output(hidden_states)
@@ -118,6 +120,6 @@ print(twitterVoc.to_index("this"))
 print(twitterVoc.num_words)
 
 
-ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
+ourLSTM = LSTM(twitterVoc.num_words, 64, 4)
 
-ourLSTM.forward(tokenizedTweets[:50])
+ourLSTM.forward(tokenizedTweets[:2])
