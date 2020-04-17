@@ -23,7 +23,7 @@ class Vocab:
 
     def __init__(self, name):
         self.name = name
-        self.word2index = {"PAD" : 0, "SOS" : 1, "EOS" : 2}
+        self.word2index = {}
         self.word2count = {}
         self.index2word = {0: "PAD", 1: "SOS", 2: "EOS"}
         self.num_words = 3
@@ -68,7 +68,7 @@ class Vocab:
             word = word.lower()
             vec.append(self.to_index(word))
         while len(vec) < self.longest_sentence:
-            vec.append(self.to_index("PAD"))
+            vec.append(0)
         return vec
 
 
@@ -117,10 +117,7 @@ for t in tweets[0]:
     twitterVoc.add_sentence(t)
 for t in tweets[0]:
     tokenizedTweets.append(twitterVoc.sentence_to_vec(t))
-print(tokenizedTweets)
-print(type(tokenizedTweets))
-tokenizedTweets = torch.stack(torch.IntTensor(tokenizedTweets))
-print(tokenizedTweets)
+tokenizedTweets = torch.IntTensor(tokenizedTweets)
 
 print(twitterVoc.to_word(4))
 print(twitterVoc.to_index("this"))
