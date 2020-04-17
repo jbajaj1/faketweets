@@ -11,8 +11,8 @@ def load_tweets(filename):
     r = open(filename, 'r')
     for line in r:
         line = line.split()
-        X.append(line[0])
-        y.append(line[1:])
+        y.append(line[0])
+        X.append(line[1:])
     return X, y
 
 class Vocab:
@@ -65,7 +65,8 @@ class Vocab:
     def sentence_to_vec(self, sentence):
         vec = []
         for word in sentence:
-            vec.append[self.to_index(word)]
+            word = word.lower()
+            vec.append(self.to_index(word))
         return vec
 
 
@@ -75,23 +76,44 @@ class LSTM(torch.nn.Module):
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
         self.hidden_size = hidden_size
-        self. num_layers = num_layers
-        self.dropout = dropout
+        self.num_layers = num_layers
+        self.dropout = torch.nn.Dropout(dropout)
 
         self.embedding = nn.Embedding(self.vocab_size, self.embedding_size)
+        self.rnn = nn.LSTM(self.embedding_size, self.hidden_size, self.num_layers, batch_first=True)
+        self.output = nn.Linear(self.hidden_size, self.vocab_size)
+
 
     def arrToVec(self, X):
         xMat = []
         for sentence in X:
             xMat.append(twitterVoc.sentence_to_vec(sentence))
+        xMat = torch.stack(xMat)
         return xMat
+
+    def forward(self, X):
+        print(X)
+        xMat = self.arrToVec(X)
+        emb = self.embedding(xMat)
+        emb = self.dropout(emb)
+
+        hidden_states, final_state = self.rnn(emb, init_hidden_state)
+
+        hidden_states = self.dropout(hidden_states)
+
+        output_dist = self.output(hidden_states)
+
+        return output_dist, hidden_states, final_state
+
+
 
 twitterVoc = Vocab("twitter")
 
-tweets = load_tweets("./twitter_sentiment/semeval_train.txt")
-
-for t in tweets[1]:
+tweets = load_tweets("../twitter_sentiment/semeval_train.txt")
+tokenizedTweets = []
+for t in tweets[0]:
     twitterVoc.add_sentence(t)
+    tokenizedTweets.append(twitterVoc.sentence_to_vec(t))
 
 
 
@@ -100,6 +122,7 @@ print(twitterVoc.to_word(4))
 print(twitterVoc.to_index("this"))
 
 print(twitterVoc.num_words)
+
 
 ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
 
