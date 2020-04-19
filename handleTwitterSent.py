@@ -163,7 +163,7 @@ ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
 
 opt = torch.optim.Adam(ourLSTM.parameters(), lr=.1)
 loss = torch.nn.CrossEntropyLoss()
-epochs = 2
+epochs = 100
 dataset = DataLoader(TensorDataset(tokenizedTweets, tokenizedLabels), batch_size=100)
 for i in range(epochs):
     print("Training on epoch", i)
