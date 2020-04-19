@@ -78,7 +78,7 @@ class Vocab:
 
     def to_index(self, word):
         if word not in self.word2index:
-            print("Unknown word:", word)
+            #print("Unknown word:", word)
             self.unknown_count += 1
             return 1
         return self.word2index[word]
@@ -94,7 +94,7 @@ class Vocab:
 
 
 class LSTM(torch.nn.Module):
-    def __init__(self, vocab_size, embedding_size, hidden_size, num_layers=1, dropout=0.1):
+    def __init__(self, vocab_size, embedding_size, hidden_size, num_layers=2, dropout=0.1):
         super().__init__()
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
@@ -142,7 +142,6 @@ def validate(expected, predictions):
 
 
 
-
 twitterVoc = Vocab("twitter")
 
 tokenizedTweets, tokenizedLabels = load_tweets("../twitter_sentiment/semeval_train.txt",  initVoc=True)
@@ -153,8 +152,6 @@ print(twitterVoc.to_index("this"))
 print(twitterVoc.num_words)
 
 ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
-
-#ourLSTM.forward(tokenizedTweets)
 
 
 ##################
@@ -177,6 +174,7 @@ for i in range(epochs):
 
 ##################
 #####Predict######
+####Evaluation####
 ##################
 
 
@@ -195,6 +193,6 @@ for file in filelist:
 
 
 
-print(twitterVoc.unknown_count)
+print("Num Unknown Words:", twitterVoc.unknown_count)
 
 
