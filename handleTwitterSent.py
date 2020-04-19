@@ -45,6 +45,7 @@ class Vocab:
         self.num_words = 2
         self.num_sentences = 0
         self.longest_sentence = 0
+        self.unknown_count = 0
 
 
     def add_word(self, word):
@@ -77,7 +78,9 @@ class Vocab:
 
     def to_index(self, word):
         if word not in self.word2index:
-            return self.word2index["UNK"]
+            print("Unknown word:", word)
+            self.unknown_count += 1
+            return 1
         return self.word2index[word]
 
     def sentence_to_vec(self, sentence):
@@ -160,7 +163,7 @@ ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
 
 opt = torch.optim.Adam(ourLSTM.parameters(), lr=.1)
 loss = torch.nn.CrossEntropyLoss()
-epochs = 100
+epochs = 2
 dataset = DataLoader(TensorDataset(tokenizedTweets, tokenizedLabels), batch_size=100)
 for i in range(epochs):
     print("Training on epoch", i)
@@ -179,19 +182,19 @@ for i in range(epochs):
 
 predVal = ourLSTM(tokenizedTweets).argmax(dim=-1)
 
-print("Results for Train Data:", validate(tokenizedLabels, predVal))
+print("Results for Train Data:\n", validate(tokenizedLabels, predVal))
 
 
-filelist = ["../twitter_sentiment/Twitter2013_raw.txt", "../twitter_sentiment/Twitter2013_raw", "../twitter_sentiment/Twitter2015_raw", "../twitter_sentiment/Twitter2016_raw"]
+filelist = ["Twitter2013_raw.txt", "Twitter2014_raw.txt", "Twitter2015_raw.txt", "Twitter2016_raw.txt"]
 
 for file in filelist:
-    tokTestTweets, tokTestLabels = load_tweets(file)
+    tokTestTweets, tokTestLabels = load_tweets("../twitter_sentiment/" + file)
     predVal = ourLSTM(tokTestTweets).argmax(dim=-1)
-    print("Results for", file, validate(tokTestLabels, predVal))
+    print("Results for", file, "\n", validate(tokTestLabels, predVal))
 
 
 
 
-
+print(twitterVoc.unknown_count)
 
 
