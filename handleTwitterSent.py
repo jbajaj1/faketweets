@@ -8,7 +8,7 @@ import torch.utils.data as data
 from torch.utils.data import TensorDataset, DataLoader
 
 
-def load_tweets(filename, initVoc=False):
+def load_tweets(filename, Voc, initVoc=False):
     X = []
     y = []
     r = open(filename, 'r')
@@ -22,11 +22,11 @@ def load_tweets(filename, initVoc=False):
     labelDic = {"negative":0, "neutral":1, "positive":2}
     if initVoc:
         for t in X:
-            twitterVoc.add_sentence(t)
+            Voc.add_sentence(t)
     for l in y:
         tokenizedLabels.append(labelDic[l])
     for t in X:
-        tokenizedTweets.append(twitterVoc.sentence_to_vec(t))
+        tokenizedTweets.append(Voc.sentence_to_vec(t))
 
     tokenizedTweets = torch.LongTensor(tokenizedTweets)
     tokenizedLabels = torch.LongTensor(tokenizedLabels)
@@ -64,6 +64,7 @@ class Vocab:
     def add_sentence(self, sentence):
         sentence_len = 0
         #print(sentence)
+        #sentence = sentence.split("...").split(".").split("[").split("]").split("#").split("^^")
         for word in sentence:
             sentence_len += 1
             self.add_word(word)
@@ -136,20 +137,20 @@ def validate(expected, predictions):
         counter += 1
     return totdiff, numdiff
     '''
-    return confusion_matrix(expected, predictions)
+    return (expected == predictions).sum().item()/len(expected), confusion_matrix(expected, predictions)
 
 
 
-
+'''
 
 twitterVoc = Vocab("twitter")
+tokenizedTweets, tokenizedLabels = load_tweets("../twitter_sentiment/semeval_train.txt", twitterVoc, initVoc=True)
 
-tokenizedTweets, tokenizedLabels = load_tweets("../twitter_sentiment/semeval_train.txt",  initVoc=True)
 
-print(twitterVoc.to_word(4))
-print(twitterVoc.to_index("this"))
+#print(twitterVoc.to_word(4))
+#print(twitterVoc.to_index("this"))
 
-print(twitterVoc.num_words)
+#print(twitterVoc.num_words)
 
 ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
 
@@ -160,7 +161,7 @@ ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
 
 opt = torch.optim.Adam(ourLSTM.parameters(), lr=.1)
 loss = torch.nn.CrossEntropyLoss()
-epochs = 100
+epochs = 2
 dataset = DataLoader(TensorDataset(tokenizedTweets, tokenizedLabels), batch_size=100)
 for i in range(epochs):
     print("Training on epoch", i)
@@ -195,4 +196,4 @@ for file in filelist:
 
 print("Num Unknown Words:", twitterVoc.unknown_count)
 
-
+'''
