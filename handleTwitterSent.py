@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch.nn as nn
 import torch.utils.data as data
+from sklearn.metrics import f1_score
 
 from torch.utils.data import TensorDataset, DataLoader
 
@@ -124,76 +125,67 @@ class LSTM(torch.nn.Module):
 
         return output_dist
 
+
 def validate(expected, predictions):
-    '''
-    totdiff = 0
-    numdiff = 0
-    counter = 0
-    for i in expected:
-        diff = abs(i-predictions[counter])
-        totdiff += diff
-        if diff != 0:
-            numdiff += 1
-        counter += 1
-    return totdiff, numdiff
-    '''
-    return (expected == predictions).sum().item()/len(expected), confusion_matrix(expected, predictions)
+    neg_F1 = f1_score(expected == 0, predictions == 0, average="binary")
+    pos_F1 = f1_score(expected == 2, predictions == 2, average="binary")
+    F1 = f1_score(expected, predictions, average="weighted")
+    return (expected == predictions).sum().item()/len(expected), confusion_matrix(expected, predictions), neg_F1, pos_F1, F1
 
 
 
-'''
-
-twitterVoc = Vocab("twitter")
-tokenizedTweets, tokenizedLabels = load_tweets("../twitter_sentiment/semeval_train.txt", twitterVoc, initVoc=True)
-
-
-#print(twitterVoc.to_word(4))
-#print(twitterVoc.to_index("this"))
-
-#print(twitterVoc.num_words)
-
-ourLSTM = LSTM(twitterVoc.num_words, 64, 64)
+def parseargs():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train', required=True)
+    parser.add_argument('--test', required=True)
+    parser.add_argument('--emb_size')
+    parser.add_argument('--hid_size')
+    parser.add_argument('--num_layers')
+    parser.add_argument('--output')
+    parser.add_argument('--dropout')
+    return parser.parse_args()
 
 
-##################
-#####Training#####
-##################
-
-opt = torch.optim.Adam(ourLSTM.parameters(), lr=.1)
-loss = torch.nn.CrossEntropyLoss()
-epochs = 2
-dataset = DataLoader(TensorDataset(tokenizedTweets, tokenizedLabels), batch_size=100)
-for i in range(epochs):
-    print("Training on epoch", i)
-    for batchidx, (x, y) in enumerate(dataset):
-        opt.zero_grad()
-        outputs = ourLSTM(x)
-        lossVal = loss(outputs, y)
-        lossVal.backward()
-        opt.step()
+def main():
+    args = parseargs()   
 
 
-##################
-#####Predict######
-####Evaluation####
-##################
 
+    if args.output is not None:
+        with open(args.output, 'w') as fout:
+            for output in outputs:
+                print(output, file=fout)
 
-predVal = ourLSTM(tokenizedTweets).argmax(dim=-1)
+    evaluate(outputs, testY, title, len(trainY))
+    twitterVoc = TS.Vocab("twitter")
 
-print("Results for Train Data:\n", validate(tokenizedLabels, predVal))
+    #Put proper location of file here
+    tokenizedTweets, tokenizedLabels = TS.load_tweets(args.train, Voc=twitterVoc, initVoc=True)
+    ourLSTM = TS.LSTM(twitterVoc.num_words, args.emb_size, args.hid_size, args.num_layers, args.dropout)      
 
+    print(twitterVoc.to_word(4))
+    print(twitterVoc.to_index("this"))
 
-filelist = ["Twitter2013_raw.txt", "Twitter2014_raw.txt", "Twitter2015_raw.txt", "Twitter2016_raw.txt"]
+    print(twitterVoc.num_words)
 
-for file in filelist:
-    tokTestTweets, tokTestLabels = load_tweets("../twitter_sentiment/" + file)
-    predVal = ourLSTM(tokTestTweets).argmax(dim=-1)
-    print("Results for", file, "\n", validate(tokTestLabels, predVal))
+    opt = torch.optim.Adam(ourLSTM.parameters(), lr=.1)
+    loss = torch.nn.CrossEntropyLoss()
+    epochs = 30
+    dataset = DataLoader(TensorDataset(tokenizedTweets, tokenizedLabels), batch_size=100)
+    for i in range(epochs):
+        print("Training on epoch", i)
+        for batchidx, (x, y) in enumerate(dataset):
+            opt.zero_grad()
+            outputs = ourLSTM(x)
+            lossVal = loss(outputs, y)
+            lossVal.backward()
+            opt.step()
+                    
+    torch.save(ourLSTM.state_dict(), f'./models/main_run.model')
 
 
 
 
-print("Num Unknown Words:", twitterVoc.unknown_count)
 
-'''
+if __name__ == '__main__':
+    main()
