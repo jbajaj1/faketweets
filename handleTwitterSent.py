@@ -5,7 +5,7 @@ import pandas as pd
 import torch.nn as nn
 import torch.utils.data as data
 from sklearn.metrics import f1_score
-
+import argparse
 from torch.utils.data import TensorDataset, DataLoader
 
 
@@ -146,30 +146,27 @@ def parseargs():
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', required=True)
     parser.add_argument('--test', required=True)
-    parser.add_argument('--emb_size')
-    parser.add_argument('--hid_size')
-    parser.add_argument('--num_layers')
-    parser.add_argument('--output')
-    parser.add_argument('--dropout')
+    parser.add_argument('--emb_size', default=64, type=int)
+    parser.add_argument('--hid_size', default=64, type=int)
+    parser.add_argument('--num_layers', default=1, type=int)
+    parser.add_argument('--dropout', default=.1, type=float)
+    parser.add_argument('--epochs', default=30, type=int)
     return parser.parse_args()
 
 
 def main():
     args = parseargs()   
-
-
-
+    '''
     if args.output is not None:
         with open(args.output, 'w') as fout:
             for output in outputs:
                 print(output, file=fout)
-
-    evaluate(outputs, testY, title, len(trainY))
-    twitterVoc = TS.Vocab("twitter")
+    '''
+    twitterVoc = Vocab("twitter")
 
     #Put proper location of file here
-    tokenizedTweets, tokenizedLabels = TS.load_tweets(args.train, Voc=twitterVoc, initVoc=True)
-    ourLSTM = TS.LSTM(twitterVoc.num_words, args.emb_size, args.hid_size, args.num_layers, args.dropout)      
+    tokenizedTweets, tokenizedLabels = load_tweets(args.train, Voc=twitterVoc, initVoc=True)
+    ourLSTM = LSTM(twitterVoc.num_words, args.emb_size, args.hid_size, args.num_layers, args.dropout)      
 
     print(twitterVoc.to_word(4))
     print(twitterVoc.to_index("this"))
@@ -178,9 +175,8 @@ def main():
 
     opt = torch.optim.Adam(ourLSTM.parameters(), lr=.1)
     loss = torch.nn.CrossEntropyLoss()
-    epochs = 30
     dataset = DataLoader(TensorDataset(tokenizedTweets, tokenizedLabels), batch_size=100)
-    for i in range(epochs):
+    for i in range(args.epochs):
         print("Training on epoch", i)
         for batchidx, (x, y) in enumerate(dataset):
             opt.zero_grad()
@@ -189,7 +185,13 @@ def main():
             lossVal.backward()
             opt.step()
                     
-    torch.save(ourLSTM.state_dict(), f'./models/main_run.model')
+    #torch.save(ourLSTM.state_dict(), f'./models/main_run.model')
+
+    tokTestTweets, tokTestLabels = load_tweets(args.test, twitterVoc)
+    with torch.no_grad():
+        predVal = ourLSTM(tokTestTweets).argmax(dim=-1)
+        prec, conf, neg_F1, pos_F1, F1 = validate(tokTestLabels, predVal)
+        print(f'Precision with emb_size[{args.emb_size}], hid_size[{args.hid_size}], layers[{args.num_layers}], and dropout[{args.dropout}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}')
 
 
 
