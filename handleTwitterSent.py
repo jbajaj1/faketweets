@@ -40,10 +40,10 @@ class Vocab:
 
     def __init__(self, name):
         self.name = name
-        self.word2index = {}
-        self.word2count = {}
-        self.index2word = {0: "PAD", 1: "UNK"}
-        self.num_words = 2
+        self.word2index = {"UNK":1, "ATUSER":2, "HTTPTKN":3}
+        self.word2count = {"ATUSER" : 0, "HTTPTKN":0}
+        self.index2word = {0: "PAD", 1: "UNK", 2: "ATUSER", 3: "HTTPTKN"}
+        self.num_words = 4
         self.num_sentences = 0
         self.longest_sentence = 0
         self.unknown_count = 0
@@ -51,7 +51,11 @@ class Vocab:
 
     def add_word(self, word):
         word = word.lower()
-        if word not in self.word2index:
+        if "@" == word[0] and len(word) != 1:
+            self.word2count["ATUSER"] += 1
+        elif word.startswith("http") and len(word) > 4:
+            self.word2count["HTTPTKN"] += 1
+        elif word not in self.word2index:
             # First entry of word into vocabulary
             self.word2index[word] = self.num_words
             self.word2count[word] = 1
@@ -79,6 +83,10 @@ class Vocab:
         return self.index2word[index]
 
     def to_index(self, word):
+        if "@" == word[0] and len(word) != 1:
+            return 2
+        elif word.startswith("http") and len(word) > 4:
+            return 3
         if word not in self.word2index:
             #print("Unknown word:", word)
             self.unknown_count += 1
