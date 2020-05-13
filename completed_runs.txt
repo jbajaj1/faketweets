@@ -178,4 +178,3 @@ completed runs : [3 5] 128 0.1 [128]
 completed runs : [3 5] 128 0.1 [32 32]
 completed runs : [3 5] 128 0.1 [64 64]
 completed runs : [3 5] 128 0.1 [128 128]
-hihi

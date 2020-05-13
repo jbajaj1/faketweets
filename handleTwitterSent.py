@@ -257,7 +257,7 @@ def main():
             p.add(1, stateful_metrics)
 
 
-    # torch.save(ourLSTM.state_dict(), f'./models/main_run.model')
+    #torch.save(ourLSTM.state_dict(), f'./models/{args.classifier}_run.model')
 
     tokTestTweets, tokTestLabels = load_tweets(args.test, twitterVoc)
     with torch.no_grad():
@@ -269,7 +269,7 @@ def main():
             )
         elif args.classifier == "CNN":
             print(
-                f"Precision with classifier[{args.classifier}], epochs[{args.epochs}], emb_size[{args.emb_size}], hidden_size(s)[{args.hidden_sizes}], kernel_size(s)[{args.kernel_sizes}], dropout[{args.dropout}, batch_size[{args.batch_size}, and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
+                f"Precision with classifier[{args.classifier}], epochs[{args.epochs}], emb_size[{args.emb_size}], hidden_size(s)[{args.hidden_sizes}], kernel_size(s)[{args.kernel_sizes}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
             ) 
 
 
