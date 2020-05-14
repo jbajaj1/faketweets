@@ -1,15 +1,15 @@
-import torch
-from sklearn.metrics import confusion_matrix
+import argparse
 import numpy as np
 import pandas as pd
-from keras.utils import Progbar
 
+from keras.utils import Progbar
+from sklearn.metrics import confusion_matrix, f1_score
+
+import torch
 import torch.nn as nn
-import torch.utils.data as data
-from sklearn.metrics import f1_score
-import argparse
-from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.functional as F
+import torch.utils.data as data
+from torch.utils.data import TensorDataset, DataLoader
 
 
 def load_tweets(filename, Voc, initVoc=False):
@@ -35,7 +35,11 @@ def load_tweets(filename, Voc, initVoc=False):
     tokenizedTweets = torch.LongTensor(tokenizedTweets)
     tokenizedLabels = torch.LongTensor(tokenizedLabels)
 
-    return tokenizedTweets, tokenizedLabels
+    weights_comp = (
+        len(tokenizedLabels) / pd.Series(tokenizedLabels).value_counts() / len(labelDic)
+    ).to_dict()
+    weights = torch.Tensor([weights_comp[label.item()] for label in tokenizedLabels])
+    return tokenizedTweets, tokenizedLabels, weights
 
 
 class Vocab:
@@ -136,6 +140,7 @@ class LSTM(torch.nn.Module):
 class StackedConvLayer(nn.Module):
     def __init__(self, in_features, out_features, kernel_sizes=[]):
         super().__init__()
+        self.kernel_sizes = kernel_sizes
         self.layers = nn.ModuleList()
         for k in kernel_sizes:
             assert k % 2 == 1
@@ -144,23 +149,25 @@ class StackedConvLayer(nn.Module):
     def forward(self, x):
         return torch.cat([layer(x) for layer in self.layers], 1)
 
+    def extra_repr(self):
+        return f"kernel_sizes={self.kernel_sizes}"
+
 
 class CNN(torch.nn.Module):
-    def __init__(self, vocab_size, embedding_size=64, hidden_sizes=[64], kernel_sizes=[1,3,5], dropout=0.1):
+    def __init__(
+        self, vocab_size, embedding_size=64, hidden_sizes=[64], kernel_sizes=[1, 3, 5], dropout=0.1
+    ):
         super().__init__()
         self.vocab_size = vocab_size
         self.embedding_size = embedding_size
+        self.hidden_sizes = hidden_sizes
         self.embedding = nn.Embedding(self.vocab_size, self.embedding_size)
         self.dropout = torch.nn.Dropout(dropout)
 
         conv_layers = []
         prev_size = self.embedding_size
         for h in hidden_sizes:
-            conv_layers.append(
-                StackedConvLayer(
-                    prev_size, h, kernel_sizes=kernel_sizes,
-                )
-            )
+            conv_layers.append(StackedConvLayer(prev_size, h, kernel_sizes=kernel_sizes,))
             prev_size = len(kernel_sizes) * h
 
         self.conv_layer = nn.Sequential(*conv_layers)
@@ -175,16 +182,18 @@ class CNN(torch.nn.Module):
         hidden_states = F.relu(self.conv_layer(emb))
 
         hidden_states = hidden_states.permute(0, 2, 1)
-
+        hidden_states = self.dropout(hidden_states)
 
         numMask = (X != 0).float()
         mask = (X != 0).float().unsqueeze(-1).expand(hidden_states.size())
         hidden_states = (hidden_states * mask).sum(-2) / numMask.sum(-1).unsqueeze(-1)
-        hidden_states = self.dropout(hidden_states)
 
         output_dist = self.output(hidden_states)
 
         return output_dist
+
+    def extra_repr(self):
+        return f"embed_size={self.embedding_size}, hidden_sizes={self.hidden_sizes}"
 
 
 def validate(expected, predictions):
@@ -211,9 +220,22 @@ def parseargs():
     parser.add_argument("--epochs", default=30, type=int)
     parser.add_argument("--lr", default=1e-3, type=float)
     parser.add_argument("--batch_size", default=128, type=int)
-    parser.add_argument("--kernel-sizes", nargs="+", type=int, default=[1,3,5], help="kernel sizes for stacked conv layer")
-    parser.add_argument("--hidden-sizes", nargs="+", type=int, default=[64],  help="hidden sizes for multi conv layer (use for cnn)")
+    parser.add_argument(
+        "--kernel-sizes",
+        nargs="+",
+        type=int,
+        default=[1, 3, 5],
+        help="kernel sizes for stacked conv layer",
+    )
+    parser.add_argument(
+        "--hidden-sizes",
+        nargs="+",
+        type=int,
+        default=[64],
+        help="hidden sizes for multi conv layer (use for cnn)",
+    )
     parser.add_argument("--classifier", default="LSTM", type=str)
+    parser.add_argument("--weight", default=False, action="store_true")
     return parser.parse_args()
 
 
@@ -228,13 +250,19 @@ def main():
     twitterVoc = Vocab("twitter")
 
     # Put proper location of file here
-    tokenizedTweets, tokenizedLabels = load_tweets(args.train, Voc=twitterVoc, initVoc=True)
+    tokenizedTweets, tokenizedLabels, weights = load_tweets(
+        args.train, Voc=twitterVoc, initVoc=True
+    )
     if args.classifier == "LSTM":
         classifier = LSTM(
             twitterVoc.num_words, args.emb_size, args.hid_size, args.num_layers, args.dropout
         )
     elif args.classifier == "CNN":
-        classifier = CNN(twitterVoc.num_words, args.emb_size, args.hidden_sizes, args.kernel_sizes, args.dropout)
+        classifier = CNN(
+            twitterVoc.num_words, args.emb_size, args.hidden_sizes, args.kernel_sizes, args.dropout
+        )
+    else:
+        raise ValueError("AHHHHH!!!!!!! Please pick CNN or LSTM")
 
     print(twitterVoc.to_word(4))
     print(twitterVoc.to_index("this"))
@@ -242,24 +270,32 @@ def main():
     print(twitterVoc.num_words)
 
     opt = torch.optim.Adam(classifier.parameters(), lr=args.lr)
-    loss_fn = torch.nn.CrossEntropyLoss()
-    dataset = DataLoader(TensorDataset(tokenizedTweets, tokenizedLabels), batch_size=args.batch_size)
+    loss_fn = torch.nn.CrossEntropyLoss(reduce="none")
+    dataset = DataLoader(
+        TensorDataset(tokenizedTweets, tokenizedLabels, weights), batch_size=args.batch_size
+    )
+    print(classifier)
+    print(f"Number of parameters: {sum(p.numel() for p in classifier.parameters())}")
+
+    classifier.train()
     for i in range(args.epochs):
         p = Progbar(len(dataset))
-        for batchidx, (x, y) in enumerate(dataset):
+        for batchidx, (x, y, w) in enumerate(dataset):
             opt.zero_grad()
             outputs = classifier(x)
-            lossVal = loss_fn(outputs, y)
+            if args.weight:
+                lossVal = (loss_fn(outputs, y) * w).mean()
+            else:
+                lossVal = loss_fn(outputs, y).mean()
             stateful_metrics = []
             stateful_metrics.append((f"Train Loss on epoch {i}", lossVal.item()))
             lossVal.backward()
             opt.step()
             p.add(1, stateful_metrics)
 
-
-    #torch.save(ourLSTM.state_dict(), f'./models/{args.classifier}_run.model')
-
-    tokTestTweets, tokTestLabels = load_tweets(args.test, twitterVoc)
+    # torch.save(ourLSTM.state_dict(), f'./models/{args.classifier}_run.model')
+    classifier.eval()
+    tokTestTweets, tokTestLabels, _ = load_tweets(args.test, twitterVoc)
     with torch.no_grad():
         predVal = classifier(tokTestTweets).argmax(dim=-1)
         prec, conf, neg_F1, pos_F1, F1 = validate(tokTestLabels, predVal)
@@ -270,7 +306,7 @@ def main():
         elif args.classifier == "CNN":
             print(
                 f"Precision with classifier[{args.classifier}], epochs[{args.epochs}], emb_size[{args.emb_size}], hidden_size(s)[{args.hidden_sizes}], kernel_size(s)[{args.kernel_sizes}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
-            ) 
+            )
 
 
 if __name__ == "__main__":
