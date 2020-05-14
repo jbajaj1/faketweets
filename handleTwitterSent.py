@@ -234,7 +234,7 @@ def parseargs():
         default=[64],
         help="hidden sizes for multi conv layer (use for cnn)",
     )
-    parser.add_argument("--classifier", default="LSTM", type=str)
+    parser.add_argument("--classifier", default="LSTM", choices=["LSTM", "CNN"], type=str)
     parser.add_argument("--weight", default=False, action="store_true")
     return parser.parse_args()
 
@@ -270,7 +270,7 @@ def main():
     print(twitterVoc.num_words)
 
     opt = torch.optim.Adam(classifier.parameters(), lr=args.lr)
-    loss_fn = torch.nn.CrossEntropyLoss(reduce="none")
+    loss_fn = torch.nn.CrossEntropyLoss(reduction="none")
     dataset = DataLoader(
         TensorDataset(tokenizedTweets, tokenizedLabels, weights), batch_size=args.batch_size
     )
@@ -283,10 +283,13 @@ def main():
         for batchidx, (x, y, w) in enumerate(dataset):
             opt.zero_grad()
             outputs = classifier(x)
+
             if args.weight:
-                lossVal = (loss_fn(outputs, y) * w).mean()
+                lossVal = loss_fn(outputs, y) * w
             else:
-                lossVal = loss_fn(outputs, y).mean()
+                lossVal = loss_fn(outputs, y)
+
+            lossVal = lossVal.mean()
             stateful_metrics = []
             stateful_metrics.append((f"Train Loss on epoch {i}", lossVal.item()))
             lossVal.backward()
@@ -301,11 +304,11 @@ def main():
         prec, conf, neg_F1, pos_F1, F1 = validate(tokTestLabels, predVal)
         if args.classifier == "LSTM":
             print(
-                f"Precision with classifier[{args.classifier}], epochs[{args.epochs}], emb_size[{args.emb_size}], hid_size[{args.hid_size}], layers[{args.num_layers}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
+                f"Precision with classifier[{args.classifier}], weight[{args.weight}], epochs[{args.epochs}], emb_size[{args.emb_size}], hid_size[{args.hid_size}], layers[{args.num_layers}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
             )
         elif args.classifier == "CNN":
             print(
-                f"Precision with classifier[{args.classifier}], epochs[{args.epochs}], emb_size[{args.emb_size}], hidden_size(s)[{args.hidden_sizes}], kernel_size(s)[{args.kernel_sizes}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
+                f"Precision with classifier[{args.classifier}], weight[{args.weight}], epochs[{args.epochs}], emb_size[{args.emb_size}], hidden_size(s)[{args.hidden_sizes}], kernel_size(s)[{args.kernel_sizes}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
             )
 
 
