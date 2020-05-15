@@ -1,6 +1,8 @@
 import argparse
+import re
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plot
 
 from keras.utils import Progbar
 from sklearn.metrics import confusion_matrix, f1_score
@@ -45,6 +47,7 @@ def load_tweets(filename, Voc, initVoc=False):
 class Vocab:
     def __init__(self, name):
         self.name = name
+        #self.special_chars = special_chars
         self.word2index = {"UNK": 1, "ATUSER": 2, "HTTPTKN": 3}
         self.word2count = {"ATUSER": 0, "HTTPTKN": 0}
         self.index2word = {0: "PAD", 1: "UNK", 2: "ATUSER", 3: "HTTPTKN"}
@@ -52,6 +55,7 @@ class Vocab:
         self.num_sentences = 0
         self.longest_sentence = 0
         self.unknown_count = 0
+        #self.chars_list = [".", "#", "^"]
 
     def add_word(self, word):
         word = word.lower()
@@ -74,6 +78,41 @@ class Vocab:
         # print(sentence)
         # sentence = sentence.split("...").split(".").split("[").split("]").split("#").split("^^")
         for word in sentence:
+            '''
+            if self.special_chars:
+                if word.contains("http") and len(word) > 4:
+                    continue
+                elif "@" == word[0] and len(word) != 1:
+                    continue
+                occurences = []
+                print("THIS IS THE WORD", word)
+                for c in self.chars_list:
+                    if c != "[" and c != "]":
+                        occurences += [m.start() for m in re.finditer(c, word)] 
+                    else:
+                        c_backslash = "\\" + c
+                        occurences += [m.start() for m in re.finditer(c_backslash, word)] 
+
+                if len(occurences) > 0:
+                    o_prev = 0
+                    for o in occurences:
+                        w = word[o_prev:o]
+                        if w != "":
+                            sentence_len += 1
+                            print(w)
+                            self.add_word(w)
+                        sentence_len += 1
+                        print(word[o])
+                        self.add_word(word[o])
+                        o_prev = o + 1
+                    if o != len(word) - 1:
+                        sentence_len += 1
+                        print(word[o_prev:])
+                        self.add_word(word[o_prev:])
+                else:
+                    sentence_len += 1
+                    self.add_word(word)
+            '''
             sentence_len += 1
             self.add_word(word)
         if sentence_len > self.longest_sentence:
@@ -212,7 +251,7 @@ def validate(expected, predictions):
 def parseargs():
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", required=True)
-    parser.add_argument("--test", required=True)
+    parser.add_argument("--test", required=True, nargs="+")
     parser.add_argument("--emb-size", default=64, type=int)
     parser.add_argument("--hid-size", default=64, type=int, help="use for lstm")
     parser.add_argument("--num-layers", default=1, type=int)
@@ -236,6 +275,7 @@ def parseargs():
     )
     parser.add_argument("--classifier", default="LSTM", choices=["LSTM", "CNN"], type=str)
     parser.add_argument("--weight", default=False, action="store_true")
+    #parser.add_argument("--special-chars", default=False, action="store_true")
     return parser.parse_args()
 
 
@@ -262,7 +302,7 @@ def main():
             twitterVoc.num_words, args.emb_size, args.hidden_sizes, args.kernel_sizes, args.dropout
         )
     else:
-        raise ValueError("AHHHHH!!!!!!! Please pick CNN or LSTM")
+        raise ValueError("Please pick CNN or LSTM")
 
     print(twitterVoc.to_word(4))
     print(twitterVoc.to_index("this"))
@@ -298,18 +338,19 @@ def main():
 
     # torch.save(ourLSTM.state_dict(), f'./models/{args.classifier}_run.model')
     classifier.eval()
-    tokTestTweets, tokTestLabels, _ = load_tweets(args.test, twitterVoc)
-    with torch.no_grad():
-        predVal = classifier(tokTestTweets).argmax(dim=-1)
-        prec, conf, neg_F1, pos_F1, F1 = validate(tokTestLabels, predVal)
-        if args.classifier == "LSTM":
-            print(
-                f"Precision with classifier[{args.classifier}], weight[{args.weight}], epochs[{args.epochs}], emb_size[{args.emb_size}], hid_size[{args.hid_size}], layers[{args.num_layers}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
-            )
-        elif args.classifier == "CNN":
-            print(
-                f"Precision with classifier[{args.classifier}], weight[{args.weight}], epochs[{args.epochs}], emb_size[{args.emb_size}], hidden_size(s)[{args.hidden_sizes}], kernel_size(s)[{args.kernel_sizes}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
-            )
+    for test in args.test:
+        tokTestTweets, tokTestLabels, _ = load_tweets(test, twitterVoc)
+        with torch.no_grad():
+            predVal = classifier(tokTestTweets).argmax(dim=-1)
+            prec, conf, neg_F1, pos_F1, F1 = validate(tokTestLabels, predVal)
+            if args.classifier == "LSTM":
+                print(
+                    f"On {test} we have Precision with classifier[{args.classifier}], weight[{args.weight}], epochs[{args.epochs}], emb_size[{args.emb_size}], hid_size[{args.hid_size}], layers[{args.num_layers}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
+                )
+            elif args.classifier == "CNN":
+                print(
+                    f"On {test} we have Precision with classifier[{args.classifier}], weight[{args.weight}], epochs[{args.epochs}], emb_size[{args.emb_size}], hidden_size(s)[{args.hidden_sizes}], kernel_size(s)[{args.kernel_sizes}], dropout[{args.dropout}], batch_size[{args.batch_size}], and learning rate[{args.lr}]: {prec}\nF1: {F1}\nNegF1: {neg_F1}\nPosF1: {pos_F1}"
+                )
 
 
 if __name__ == "__main__":
