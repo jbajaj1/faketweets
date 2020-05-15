@@ -219,7 +219,7 @@ def parseargs():
     parser.add_argument("--dropout", default=0.1, type=float)
     parser.add_argument("--epochs", default=30, type=int)
     parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--batch_size", default=128, type=int)
+    parser.add_argument("--batch-size", default=128, type=int)
     parser.add_argument(
         "--kernel-sizes",
         nargs="+",
