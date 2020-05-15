@@ -8,7 +8,9 @@ with open("weighted_cnn_results.txt", 'r') as r:
 		data = line[-1]
 		line = line[:-1]
 		val_str = ""
-		for value in line:
+		for idx_line, value in enumerate(line):
+			if idx_line == 5:
+				val_str += "N/A,"
 			if value != "":
 				value = value.split("[")[-1]
 				if "," in value:
